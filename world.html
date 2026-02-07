@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Wordly</title>
+<style>
+  :root{
+    --bg:#121213;
+    --text:#ffffff;
+
+    --absent:#3a3a3c;
+    --present:#b59f3b;
+    --correct:#538d4e;
+
+    --empty-border:#3a3a3c;
+    --filled-border:#565758;
+
+    --key-bg:#818384;
+    --key-text:#ffffff;
+
+    --toast-bg:#0f1011;
+    --toast-border:#2a2b2d;
+
+    --modal-bg: rgba(0,0,0,.65);
+    --modal-card:#0f1011;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:0;
+  }
+
+  /* Topbar */
+  .topbar{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 24px;
+    border-bottom:1px solid #3a3a3c;
+    margin-bottom:24px;
+  }
+  .topbar .title{
+    font-size:28px;
+    font-weight:800;
+    letter-spacing:0.5px;
+  }
+  .topbar .date{
+    font-size:14px;
+    opacity:0.7;
+  }
+
+  .app{
+    width:min(520px, 100%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:18px;
+    padding:0 12px 28px;
+  }
+
+  /* Toast */
+  .toast{
+    position:fixed;
+    top:14px;
+    left:50%;
+    transform:translateX(-50%);
+    background:var(--toast-bg);
+    border:1px solid var(--toast-border);
+    color:var(--text);
+    padding:10px 14px;
+    border-radius:10px;
+    font-weight:700;
+    letter-spacing:.2px;
+    z-index:50;
+    opacity:0;
+    pointer-events:none;
+  }
+  .toast.show{
+    animation: toastInOut 1600ms ease-in-out forwards;
+  }
+  @keyframes toastInOut{
+    0%{ opacity:0; transform:translateX(-50%) translateY(-10px); }
+    12%{ opacity:1; transform:translateX(-50%) translateY(0); }
+    80%{ opacity:1; transform:translateX(-50%) translateY(0); }
+    100%{ opacity:0; transform:translateX(-50%) translateY(-10px); }
+  }
+
+  /* Board */
+  .board{
+    display:grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap:8px;
+    padding:8px 0;
+    user-select:none;
+  }
+  .row{
+    display:grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap:8px;
+  }
+  .tile{
+    width:62px;
+    height:62px;
+    border:2px solid var(--empty-border);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    font-size:32px;
+    line-height:1;
+    text-transform:uppercase;
+    background:transparent;
+    border-radius:2px;
+  }
+  .filled{ border-color:var(--filled-border); }
+
+  .correct{ background:var(--correct); border-color:var(--correct); }
+  .present{ background:var(--present); border-color:var(--present); }
+  .absent { background:var(--absent);  border-color:var(--absent); }
+
+  /* Animations */
+  .pop{ animation: pop 120ms ease-out; }
+  @keyframes pop{ 0%{transform:scale(1)} 50%{transform:scale(1.08)} 100%{transform:scale(1)} }
+
+  .shake{ animation: shake 240ms ease-in-out; }
+  @keyframes shake{
+    0%,100%{ transform:translateX(0); }
+    20%{ transform:translateX(-6px); }
+    40%{ transform:translateX(6px); }
+    60%{ transform:translateX(-4px); }
+    80%{ transform:translateX(4px); }
+  }
+
+  .flip{
+    animation: flip 600ms ease-in-out forwards;
+    transform-style:preserve-3d;
+  }
+  @keyframes flip{
+    0%{ transform:rotateX(0deg); }
+    45%{ transform:rotateX(90deg); }
+    55%{ transform:rotateX(90deg); }
+    100%{ transform:rotateX(0deg); }
+  }
+
+  /* Win jump (left -> right) */
+  .jump{ animation: jump 220ms ease-out; }
+  @keyframes jump{
+    0%{ transform:translateY(0); }
+    45%{ transform:translateY(-12px); }
+    100%{ transform:translateY(0); }
+  }
+
+  /* Keyboard */
+  .keyboard{
+    width:min(520px, 100%);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .krow{ display:flex; gap:6px; justify-content:center; }
+  .key{
+    height:50px;
+    min-width:40px;
+    padding:0 10px;
+    border:none;
+    border-radius:4px;
+    background:var(--key-bg);
+    color:var(--key-text);
+    font-weight:800;
+    font-size:14px;
+    cursor:pointer;
+    user-select:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-transform:uppercase;
+  }
+  .key.wide{ min-width:64px; padding:0 12px; font-size:13px; }
+  .key:active{ transform:translateY(1px); }
+
+  .key.correct{ background:var(--correct); }
+  .key.present{ background:var(--present); }
+  .key.absent { background:var(--absent); }
+
+  /* Modal (Wordle-ish) */
+  .modal{
+    position:fixed;
+    inset:0;
+    background:var(--modal-bg);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:60;
+    padding:18px;
+  }
+  .modal.show{ display:flex; }
+  .modal-card{
+    width:min(560px, 100%);
+    background:var(--modal-card);
+    border-radius:18px;
+    padding:26px 22px 24px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.55);
+    position:relative;
+  }
+  .modal-close{
+    position:absolute;
+    top:14px;
+    right:14px;
+    width:40px;
+    height:40px;
+    border:none;
+    background:transparent;
+    color:#e8e8e8;
+    font-size:28px;
+    line-height:40px;
+    cursor:pointer;
+    opacity:.9;
+  }
+  .modal-close:hover{ opacity:1; }
+  .badge{
+    width:52px;
+    height:52px;
+    border-radius:12px;
+    background: rgba(83,141,78,.18);
+    display:grid;
+    place-items:center;
+    margin:0 auto 14px;
+    border: 2px solid rgba(83,141,78,.35);
+  }
+  .badge svg{ width:30px; height:30px; fill: #dff4e1; }
+  .modal-title{
+    font-family: Georgia, "Times New Roman", Times, serif;
+    text-align:center;
+    font-size:40px;
+    margin:6px 0 10px;
+  }
+  .modal-text{
+    font-family: Georgia, "Times New Roman", Times, serif;
+    text-align:center;
+    font-size:20px;
+    line-height:1.35;
+    margin:0;
+    opacity:.95;
+  }
+
+  @media (max-width:420px){
+    .tile{ width:54px; height:54px; font-size:28px; }
+    .key{ height:52px; min-width:34px; }
+    .key.wide{ min-width:56px; }
+    .modal-title{ font-size:34px; }
+    .modal-text{ font-size:18px; }
+  }
+</style>
+</head>
+<body>
+  <div class="toast" id="toast" aria-live="polite"></div>
+
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Glückwunsch">
+    <div class="modal-card">
+      <button class="modal-close" id="modalClose" aria-label="Schließen">×</button>
+
+      <div class="badge" aria-hidden="true">
+        <!-- Star icon -->
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2.5l2.9 6.2 6.8.7-5.1 4.4 1.6 6.6L12 17.9 5.8 20.4 7.4 13.8 2.3 9.4l6.8-.7L12 2.5z"/>
+        </svg>
+      </div>
+
+      <div class="modal-title">Glückwunsch!</div>
+      <p class="modal-text">
+        Verfolge deine Wordle-Gewinnquote und sammle Abzeichen<br/>
+        für große Erfolge.
+      </p>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="title">Wordly</div>
+    <div class="date" id="date"></div>
+  </header>
+
+  <div class="app">
+    <div class="board" id="board" aria-label="Wordle board"></div>
+    <div class="keyboard" id="keyboard" aria-label="On-screen keyboard"></div>
+  </div>
+
+<script>
+(() => {
+  const SOLUTION = "LEGAT";
+  const MAX_ROWS = 6;
+  const MAX_COLS = 5;
+
+  let currentRow = 0;
+  let currentCol = 0;
+  let gameOver = false;
+
+  const guesses = Array.from({ length: MAX_ROWS }, () => Array(MAX_COLS).fill(""));
+  const keyState = new Map(); // letter -> 'absent' | 'present' | 'correct'
+
+  const board = document.getElementById("board");
+  const keyboard = document.getElementById("keyboard");
+  const toastEl = document.getElementById("toast");
+  const modalEl = document.getElementById("modal");
+  const modalClose = document.getElementById("modalClose");
+  const dateEl = document.getElementById("date");
+
+  // Set current date in German format
+  const now = new Date();
+  const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  dateEl.textContent = now.toLocaleDateString('de-DE', options);
+
+  // --- Helpers for "all characters" (including emoji) ---
+  const firstGrapheme = (s) => Array.from(s)[0] ?? "";
+
+  // Build board
+  for (let r = 0; r < MAX_ROWS; r++) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.dataset.row = r;
+    for (let c = 0; c < MAX_COLS; c++) {
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.dataset.col = c;
+      row.appendChild(tile);
+    }
+    board.appendChild(row);
+  }
+
+  // Build keyboard (Wordle layout + a tiny extra row for umlauts)
+  const layout = [
+    ["Q","W","E","R","T","Z","U","I","O","P"],
+    ["A","S","D","F","G","H","J","K","L"],
+    ["ENTER","Y","X","C","V","B","N","M","⌫"]
+  ];
+
+  layout.forEach((rowKeys) => {
+    const row = document.createElement("div");
+    row.className = "krow";
+
+    rowKeys.forEach((k) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "key" + ((k === "ENTER" || k === "⌫") ? " wide" : "");
+      btn.textContent = k;
+      btn.dataset.key = k;
+      btn.addEventListener("click", () => handleInput(k));
+      row.appendChild(btn);
+    });
+
+    keyboard.appendChild(row);
+  });
+
+  // Modal controls
+  modalClose.addEventListener("click", () => hideModal());
+  modalEl.addEventListener("click", (e) => {
+    if (e.target === modalEl) hideModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!modalEl.classList.contains("show")) return;
+    if (e.key === "Escape") hideModal();
+  });
+
+  function showModal(){ modalEl.classList.add("show"); }
+  function hideModal(){ modalEl.classList.remove("show"); }
+
+  function showToast(text){
+    toastEl.textContent = text;
+    toastEl.classList.remove("show");
+    void toastEl.offsetWidth;
+    toastEl.classList.add("show");
+  }
+
+  // Physical keyboard: allow basically all characters
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (modalEl.classList.contains("show")) return; // don't type through modal
+
+    if (e.key === "Backspace") return handleInput("⌫");
+    if (e.key === "Enter") return handleInput("ENTER");
+
+    // Accept any single grapheme (letters, umlauts, symbols, emoji, etc.)
+    // Ignore keys like "ArrowLeft", "Shift", etc.
+    const g = firstGrapheme(e.key);
+    if (g && Array.from(e.key).length === 1) {
+      handleInput(g);
+    }
+  });
+
+  function handleInput(key) {
+    if (gameOver) return;
+
+    if (key === "⌫") {
+      if (currentCol > 0) {
+        currentCol--;
+        guesses[currentRow][currentCol] = "";
+        renderRow(currentRow, true);
+      }
+      return;
+    }
+
+    if (key === "ENTER") {
+      if (currentCol !== MAX_COLS) {
+        shakeRow(currentRow);
+        return;
+      }
+      revealRow(currentRow);
+      return;
+    }
+
+    // Any single grapheme
+    const g = firstGrapheme(key);
+    if (!g) return;
+
+    if (currentCol < MAX_COLS) {
+      guesses[currentRow][currentCol] = g.toUpperCase(); // Ü/Ä ok, symbols unchanged
+      popTile(currentRow, currentCol);
+      currentCol++;
+      renderRow(currentRow, true);
+    }
+  }
+
+  function getRowEl(r) { return board.children[r]; }
+
+  function renderRow(r, live=false) {
+    const rowEl = getRowEl(r);
+    for (let c = 0; c < MAX_COLS; c++) {
+      const tile = rowEl.children[c];
+      const val = guesses[r][c];
+      tile.textContent = val;
+      if (live) tile.classList.toggle("filled", !!val);
+    }
+  }
+
+  function popTile(r, c) {
+    const tile = getRowEl(r).children[c];
+    tile.classList.remove("pop");
+    void tile.offsetWidth;
+    tile.classList.add("pop");
+  }
+
+  function shakeRow(r) {
+    const rowEl = getRowEl(r);
+    rowEl.classList.remove("shake");
+    void rowEl.offsetWidth;
+    rowEl.classList.add("shake");
+  }
+
+  function upgradeKeyState(letter, state) {
+    // priority: correct > present > absent
+    const prev = keyState.get(letter);
+    const rank = { absent:1, present:2, correct:3 };
+    if (!prev || rank[state] > rank[prev]) {
+      keyState.set(letter, state);
+      const btns = keyboard.querySelectorAll(`[data-key="${cssEscape(letter)}"]`);
+      btns.forEach(b => {
+        b.classList.remove("absent","present","correct");
+        b.classList.add(state);
+      });
+    }
+  }
+
+  // CSS.escape fallback
+  function cssEscape(s){
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return s.replace(/["\\]/g, "\\$&");
+  }
+
+  function winJumpRow(r){
+    const rowEl = getRowEl(r);
+    for (let i = 0; i < MAX_COLS; i++) {
+      const tile = rowEl.children[i];
+      setTimeout(() => {
+        tile.classList.remove("jump");
+        void tile.offsetWidth;
+        tile.classList.add("jump");
+      }, i * 90);
+    }
+  }
+
+  function revealRow(r) {
+    const guess = guesses[r].join("");
+    const rowEl = getRowEl(r);
+
+    // Standard Wordle duplicate handling:
+    const solutionArr = SOLUTION.split("");
+    const guessArr = guess.split(""); // solution is plain ASCII, ok
+    const result = Array(MAX_COLS).fill("absent");
+
+    // Greens
+    for (let i = 0; i < MAX_COLS; i++) {
+      if (guessArr[i] === solutionArr[i]) {
+        result[i] = "correct";
+        solutionArr[i] = null;
+      }
+    }
+    // Yellows
+    for (let i = 0; i < MAX_COLS; i++) {
+      if (result[i] === "correct") continue;
+      const idx = solutionArr.indexOf(guessArr[i]);
+      if (idx !== -1) {
+        result[i] = "present";
+        solutionArr[idx] = null;
+      }
+    }
+
+    // Flip per tile with delay (Wordle-ish)
+    for (let i = 0; i < MAX_COLS; i++) {
+      const tile = rowEl.children[i];
+      const state = result[i];
+      const letter = guessArr[i];
+
+      setTimeout(() => {
+        tile.classList.remove("flip");
+        void tile.offsetWidth;
+        tile.classList.add("flip");
+
+        // Apply color at mid flip
+        setTimeout(() => {
+          tile.classList.add(state);
+          // only update on-screen keyboard if it has that key (letters + umlauts)
+          upgradeKeyState(letter, state);
+        }, 270);
+      }, i * 120);
+    }
+
+    // After reveal finishes
+    const revealDoneMs = (MAX_COLS - 1) * 120 + 650;
+    setTimeout(() => {
+      if (guess === SOLUTION) {
+        // Small popup + win jump animation, then show the congrats modal
+        showToast("Prächtig!");
+        winJumpRow(r);
+        setTimeout(showModal, 420);
+        gameOver = true;
+        return;
+      }
+
+      currentRow++;
+      currentCol = 0;
+
+      if (currentRow >= MAX_ROWS) {
+        // no notification requested; still a little toast feels fine, but if you want none, delete next line
+        showToast("Schade.");
+        gameOver = true;
+      }
+    }, revealDoneMs);
+  }
+
+  // Initial render
+  for (let r = 0; r < MAX_ROWS; r++) renderRow(r, true);
+})();
+</script>
+</body>
+</html>
