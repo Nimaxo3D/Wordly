@@ -251,6 +251,21 @@
     margin:0;
     opacity:.95;
   }
+  .badge.lose{
+    background: rgba(58,58,60,.18);
+    border: 2px solid rgba(58,58,60,.45);
+  }
+  .badge.win{
+    background: rgba(83,141,78,.18);
+    border: 2px solid rgba(83,141,78,.35);
+  }
+  .solution{
+    display:inline-block;
+    margin-top:10px;
+    font-weight:900;
+    letter-spacing:3px;
+    font-size:28px;
+  }
 
   @media (max-width:420px){
     .tile{ width:54px; height:54px; font-size:28px; }
@@ -264,19 +279,18 @@
 <body>
   <div class="toast" id="toast" aria-live="polite"></div>
 
-  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Glückwunsch">
+    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Ergebnis">
     <div class="modal-card">
       <button class="modal-close" id="modalClose" aria-label="Schließen">×</button>
 
-      <div class="badge" aria-hidden="true">
-        <!-- Star icon -->
-        <svg viewBox="0 0 24 24">
-          <path d="M12 2.5l2.9 6.2 6.8.7-5.1 4.4 1.6 6.6L12 17.9 5.8 20.4 7.4 13.8 2.3 9.4l6.8-.7L12 2.5z"/>
+      <div class="badge" id="modalBadge" aria-hidden="true">
+        <svg id="modalIcon" viewBox="0 0 24 24">
+          <path id="modalIconPath" d="M12 2.5l2.9 6.2 6.8.7-5.1 4.4 1.6 6.6L12 17.9 5.8 20.4 7.4 13.8 2.3 9.4l6.8-.7L12 2.5z"/>
         </svg>
       </div>
 
-      <div class="modal-title">Glückwunsch!</div>
-      <p class="modal-text">
+      <div class="modal-title" id="modalTitle">Glückwunsch!</div>
+      <p class="modal-text" id="modalText">
         Verfolge deine Wordle-Gewinnquote und sammle Abzeichen<br/>
         für große Erfolge.
       </p>
@@ -312,6 +326,32 @@
   const modalEl = document.getElementById("modal");
   const modalClose = document.getElementById("modalClose");
   const dateEl = document.getElementById("date");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalText  = document.getElementById("modalText");
+  const modalBadge = document.getElementById("modalBadge");
+  const modalIconPath = document.getElementById("modalIconPath");
+
+  function openEndScreen(type){
+    if (type === "win") {
+      modalBadge.classList.remove("lose");
+      modalBadge.classList.add("win");
+      modalTitle.textContent = "Glückwunsch!";
+      modalText.innerHTML = `Prächtig!<br/>Du hast das Wort erraten.`;
+      // star icon
+      modalIconPath.setAttribute("d","M12 2.5l2.9 6.2 6.8.7-5.1 4.4 1.6 6.6L12 17.9 5.8 20.4 7.4 13.8 2.3 9.4l6.8-.7L12 2.5z");
+      showModal();
+      return;
+    }
+
+    // lose
+    modalBadge.classList.remove("win");
+    modalBadge.classList.add("lose");
+    modalTitle.textContent = "Schade!";
+    modalText.innerHTML = `Das richtige Wort war:<br/><span class="solution">${SOLUTION}</span>`;
+    // X icon
+    modalIconPath.setAttribute("d","M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7A1 1 0 0 0 5.7 7.1l4.9 4.9-4.9 4.9a1 1 0 1 0 1.4 1.4l4.9-4.9 4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z");
+    showModal();
+  }
 
   // Set current date in German format
   const now = new Date();
@@ -536,22 +576,23 @@
     const revealDoneMs = (MAX_COLS - 1) * 120 + 650;
     setTimeout(() => {
       if (guess === SOLUTION) {
-        // Small popup + win jump animation, then show the congrats modal
         showToast("Prächtig!");
         winJumpRow(r);
-        setTimeout(showModal, 420);
+        setTimeout(() => openEndScreen("win"), 420);
         gameOver = true;
         return;
       }
+
 
       currentRow++;
       currentCol = 0;
 
       if (currentRow >= MAX_ROWS) {
-        // no notification requested; still a little toast feels fine, but if you want none, delete next line
         showToast("Schade.");
+        setTimeout(() => openEndScreen("lose"), 350);
         gameOver = true;
       }
+
     }, revealDoneMs);
   }
 
